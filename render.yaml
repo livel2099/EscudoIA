@@ -11,8 +11,6 @@ services:
     plan: free
     dockerfilePath: ./Dockerfile
     healthCheckPath: /actuator/health
-    domains:
-      - livel.pro
     autoDeployTrigger: commit
     envVars:
       - key: DB_HOST
@@ -34,9 +32,15 @@ services:
       - key: FREE_DAILY_SCAN_LIMIT
         value: 10
       - key: FRONTEND_URL
-        value: https://livel.pro
+        fromService:
+          type: web
+          name: escudo-ia
+          envVarKey: RENDER_EXTERNAL_URL
       - key: CORS_ALLOWED_ORIGINS
-        value: https://livel.pro
+        fromService:
+          type: web
+          name: escudo-ia
+          envVarKey: RENDER_EXTERNAL_URL
       - key: MP_PRODUCTION_MODE
         value: false
       - key: MP_MOCK_MODE
@@ -47,8 +51,6 @@ services:
         sync: false
       - key: MP_TEST_PUBLIC_KEY
         sync: false
-      - key: MP_WEBHOOK_URL
-        value: https://livel.pro/api/pagos/webhook
       - key: MERCADOPAGO_WEBHOOK_SECRET
         sync: false
       - key: ADMIN_EMAIL

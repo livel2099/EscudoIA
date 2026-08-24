@@ -45,7 +45,7 @@ app:
     checkout-mode: ${MP_CHECKOUT_MODE:API}
     access-token: ${MP_TEST_ACCESS_TOKEN:${MERCADOPAGO_ACCESS_TOKEN:}}
     public-key: ${MP_TEST_PUBLIC_KEY:}
-    webhook-url: ${MP_WEBHOOK_URL:http://localhost:8080/api/pagos/webhook}
+    webhook-url: "${MP_WEBHOOK_URL:${RENDER_EXTERNAL_URL:http://localhost:8080}/api/pagos/webhook}"
     webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
     api-base-url: https://api.mercadopago.com
 
