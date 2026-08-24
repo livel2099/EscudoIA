@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:escudo;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+app:
+  jwt:
+    secret: test-secret-for-escudo-ia-at-least-32-bytes
+    access-ttl-seconds: 900
+    refresh-ttl-seconds: 3600
+  cors:
+    allowed-origins: http://localhost:5173
+  rate-limit:
+    requests-per-minute: 500
+  mercado-pago:
+    production-mode: false
+    mock-mode: true
+    checkout-mode: API
+    access-token: test
+    public-key: test
+    webhook-url: http://localhost/webhook
+    webhook-secret: ""
+    api-base-url: https://api.mercadopago.com
