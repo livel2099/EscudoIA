@@ -53,14 +53,19 @@ docker build -t escudo-ia .
 
 Las pruebas usan H2 en modo PostgreSQL y Mercado Pago mock; nunca consumen credenciales reales.
 
-## Deploy en Render
+## Deploy manual en Render (Web Service)
 
-1. Subí el repositorio a GitHub/GitLab.
-2. En Render elegí **New → Blueprint** y seleccioná el repositorio. `render.yaml` crea PostgreSQL y el servicio Docker.
-3. Cargá los valores pendientes en **Environment**: `MP_TEST_ACCESS_TOKEN`, `MP_TEST_PUBLIC_KEY`, `MERCADOPAGO_WEBHOOK_SECRET`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` (mínimo 12 caracteres).
-4. Render asigna automáticamente un dominio HTTPS gratuito con formato `https://<servicio>.onrender.com`. El backend toma ese valor desde `RENDER_EXTERNAL_URL` para redirects, CORS y webhooks.
-5. En Mercado Pago registrá `https://<tu-dominio-onrender>/api/pagos/webhook`, habilitá eventos de pagos y copiá la firma secreta a `MERCADOPAGO_WEBHOOK_SECRET`.
-6. Verificá `/actuator/health`, creá una cuenta, ejecutá un scan y completá un pago de prueba.
+1. Subí el repositorio a GitHub o GitLab.
+2. Abrí tu PostgreSQL Free existente y copiá los datos de `Connect`. Usá la conexión interna y la misma región para el Web Service.
+3. En Render elegí **New → Web Service** y conectá el repositorio; no crees otro PostgreSQL ni uses el Blueprint para provisionar la base.
+4. Elegí `Docker`, plan `Free`, Dockerfile `./Dockerfile` y Health Check Path `/actuator/health`.
+5. En **Environment**, cargá las variables de `render.env.example`. Completá `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME` y `DB_PASSWORD` con los datos de tu base existente.
+6. Cargá también las credenciales de Mercado Pago y las variables `ADMIN_EMAIL` y `ADMIN_PASSWORD`.
+7. Creá el Web Service. Render asignará automáticamente una URL gratuita `https://<servicio>.onrender.com`.
+8. En Mercado Pago registrá `https://<tu-dominio-onrender>/api/pagos/webhook` y copiá la firma secreta a `MERCADOPAGO_WEBHOOK_SECRET`.
+9. Verificá `/actuator/health`, creá una cuenta, ejecutá un scan y completá un pago de prueba.
+
+No hace falta definir `FRONTEND_URL`, `CORS_ALLOWED_ORIGINS` ni `MP_WEBHOOK_URL`: la aplicación usa automáticamente `RENDER_EXTERNAL_URL`. El `render.yaml` queda como alternativa de Web Service solamente y ya no intenta crear una base.
 
 El webhook no confía en el redirect del navegador: consulta el pago a Mercado Pago antes de confirmar. Si se configuró `MERCADOPAGO_WEBHOOK_SECRET`, también valida `x-signature`.
 

@@ -58,6 +58,12 @@ public class MercadoPagoPaymentProvider implements PaymentProvider {
         if (settings.accessToken()==null || settings.accessToken().isBlank()) throw new ApiException(HttpStatus.SERVICE_UNAVAILABLE,"PAYMENT_NOT_CONFIGURED","Los pagos todavía no están configurados.");
     }
     private CheckoutResult mock(UUID id) { return new CheckoutResult("mock-"+id,frontend("/pago/pendiente?mock=true"),settings.publicKey(),true); }
-    private String frontend(String path) { return System.getenv().getOrDefault("FRONTEND_URL","http://localhost:5173")+path; }
+    private String frontend(String path) {
+        String base = System.getenv("FRONTEND_URL");
+        if (base == null || base.isBlank()) base = System.getenv("RENDER_EXTERNAL_URL");
+        if (base == null || base.isBlank()) base = "http://localhost:5173";
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base + path;
+    }
 }
 
