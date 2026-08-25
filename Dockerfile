@@ -14,10 +14,13 @@ COPY --from=frontend-build /workspace/frontend/dist ./src/main/resources/static
 RUN mvn -q -DskipTests package
 
 FROM eclipse-temurin:21-jre-alpine
-RUN addgroup -S escudo && adduser -S escudo -G escudo
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-spa tesseract-ocr-data-eng && \
+    tesseract --version && tesseract --list-langs && \
+    addgroup -S escudo && adduser -S escudo -G escudo
+ENV OMP_THREAD_LIMIT=1
 WORKDIR /app
 COPY --from=backend-build /workspace/backend/target/escudo-backend-0.1.0.jar app.jar
 USER escudo
 EXPOSE 8080
-ENTRYPOINT ["java","-XX:MaxRAMPercentage=75","-XX:+UseContainerSupport","-jar","/app/app.jar"]
+ENTRYPOINT ["java","-Xms64m","-Xmx256m","-XX:+UseSerialGC","-XX:+UseContainerSupport","-XX:+ExitOnOutOfMemoryError","-jar","/app/app.jar"]
 

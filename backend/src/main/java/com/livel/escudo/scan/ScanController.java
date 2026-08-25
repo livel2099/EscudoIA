@@ -12,7 +12,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -21,7 +20,12 @@ import java.util.UUID;
 @RequestMapping("/api/scans")
 public class ScanController {
     private final ScanService service;
-    public ScanController(ScanService service) { this.service = service; }
+    private final ImageTextExtractor imageTextExtractor;
+
+    public ScanController(ScanService service, ImageTextExtractor imageTextExtractor) {
+        this.service = service;
+        this.imageTextExtractor = imageTextExtractor;
+    }
 
     @PostMapping("/text")
     public ScanService.ScanResponse text(@Valid @RequestBody ScanRequest request, @AuthenticationPrincipal UserEntity user, HttpServletRequest http) {
@@ -40,13 +44,16 @@ public class ScanController {
     @PostMapping(value = "/image", consumes = "multipart/form-data")
     public ScanService.ScanResponse image(@RequestPart("file") MultipartFile file,
                                           @RequestPart(value = "context", required = false) String context,
-                                          @AuthenticationPrincipal UserEntity user, HttpServletRequest http) throws IOException {
+                                          @AuthenticationPrincipal UserEntity user, HttpServletRequest http) {
         if (file.isEmpty() || file.getSize() > 5_000_000) throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "INVALID_IMAGE", "La imagen debe pesar menos de 5 MB.");
         if (file.getContentType() == null || !Set.of("image/png", "image/jpeg", "image/webp").contains(file.getContentType()))
             throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "INVALID_IMAGE_TYPE", "Usá una imagen PNG, JPG o WebP.");
-        String safeName = file.getOriginalFilename() == null ? "captura" : file.getOriginalFilename().replaceAll("[^A-Za-z0-9._-]", "_");
-        String description = "Imagen recibida: " + safeName + ". Contexto del usuario: " + (context == null ? "sin contexto" : context);
-        return service.analyze("IMAGE", description, user, http);
+        if (context != null && context.length() > 2_000)
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "IMAGE_CONTEXT_TOO_LARGE", "El contexto no puede superar los 2.000 caracteres.");
+        String extractedText = imageTextExtractor.extract(file);
+        String analysisText = context == null || context.isBlank() ? extractedText :
+                extractedText + "\n\nContexto aportado por el usuario:\n" + context.strip();
+        return service.analyze("IMAGE", analysisText, user, http);
     }
     @GetMapping public Page<ScanService.ScanSummary> history(@AuthenticationPrincipal UserEntity user,
                                                              @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size) {

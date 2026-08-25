@@ -19,6 +19,7 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 6MB
+      file-size-threshold: 0B
   lifecycle:
     timeout-per-shutdown-phase: 20s
 management:
@@ -31,6 +32,11 @@ management:
       probes:
         enabled: true
 app:
+  ocr:
+    command: ${OCR_COMMAND:tesseract}
+    language: ${OCR_LANGUAGE:spa+eng}
+    timeout-seconds: ${OCR_TIMEOUT_SECONDS:25}
+    max-pixels: ${OCR_MAX_PIXELS:8000000}
   jwt:
     secret: ${JWT_ACCESS_SECRET:dev-only-secret-change-me-32-bytes-minimum}
     access-ttl-seconds: ${JWT_ACCESS_TTL:900}

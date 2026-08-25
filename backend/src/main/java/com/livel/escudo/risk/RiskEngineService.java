@@ -56,6 +56,11 @@ public class RiskEngineService {
         boolean hasEmbeddedUrl = EMBEDDED_URL.matcher(text).find();
         boolean financialLure = lower.matches("(?s).*(fondos? (?:internacionales )?recibidos?|notificaci[oó]n de fondos|total depositado|naturaleza del cr[eé]dito|c[oó]digo de transacci[oó]n|cr[eé]dito (?:ha sido )?confirmado|dep[oó]sito (?:recibido|confirmado)).*");
         boolean accountAccessCta = hasEmbeddedUrl && lower.matches("(?s).*(acceder (?:a|al)|acceda|ingres[ae]|haga clic|haz clic|bot[oó]n|revisar los detalles|ver detalles).*");
+        boolean legalNotice = lower.matches("(?s).*(notificaci[oó]n jur[ií]dica|comunicaci[oó]n procesal|asunto jur[ií]dico|documento procesal).*");
+        boolean legalCaseDetails = lower.matches("(?s).*(informaci[oó]n procesal|n[uú]mero de proceso|tribunal|caso\\s*:?\\s*\\d+).*");
+        boolean legalLure = legalNotice && legalCaseDetails;
+        boolean documentAccessCta = lower.matches("(?s).*(acceder (?:al |a la )?(?:documento|comunicaci[oó]n|expediente)|documento (?:procesal )?preparado para su revisi[oó]n|requiere su consulta).*");
+        boolean genericLegalAuthority = legalLure && lower.matches("(?s).*(oficina jur[ií]dica|gestor jur[ií]dico|departamento legal).*");
         add(found, lower.matches("(?s).*(urgente|inmediatamente|ahora mismo|último aviso|ultimo aviso|cuenta suspendida|vence hoy).*") ,
                 "URGENCY", "SOCIAL_ENGINEERING", 75, "HIGH", .86, "Usa presión temporal para acelerar una decisión.");
         add(found, lower.matches("(?s).*(contraseña|contrasena|iniciar sesión|iniciar sesion|verificá tu cuenta|verifica tu cuenta|credenciales).*") ,
@@ -66,6 +71,12 @@ public class RiskEngineService {
                 "PAYMENT_REQUEST", "CONTEXT_BEHAVIOR", 90, "HIGH", .86, "Incluye una solicitud o incentivo de pago.");
         add(found, financialLure, "FINANCIAL_LURE", "CONTEXT_BEHAVIOR", 100, "HIGH", .9,
                 "Promete o confirma fondos inesperados para inducir una acción.");
+        add(found, legalLure, "LEGAL_PROCESS_LURE", "CONTEXT_BEHAVIOR", 100, "HIGH", .9,
+                "Presenta un proceso o expediente jurídico no solicitado para provocar una consulta.");
+        add(found, documentAccessCta, "DOCUMENT_ACCESS_CTA", "SOCIAL_ENGINEERING", 100, "HIGH", .89,
+                "Presiona para abrir un supuesto documento o comunicación procesal.");
+        add(found, genericLegalAuthority, "GENERIC_AUTHORITY_IMPERSONATION", "BRAND_IMPERSONATION", 85, "HIGH", .82,
+                "La comunicación usa una autoridad jurídica genérica sin una identidad verificable.");
         add(found, accountAccessCta, "ACCOUNT_ACCESS_CTA", "SOCIAL_ENGINEERING", 100, "HIGH", .9,
                 "Invita a acceder a una cuenta mediante un enlace incluido en el mensaje.");
         add(found, hasEmbeddedUrl && lower.matches("(?s).*(protocolos seguros|cr[eé]dito (?:ha sido )?confirmado|fondos (?:est[aá]n )?disponibles).*") ,
@@ -88,8 +99,15 @@ public class RiskEngineService {
         int score = (int)Math.round(strongest.entrySet().stream().mapToDouble(e ->
                 weights.getOrDefault(e.getKey(), defaultConfig(e.getKey())).getWeight() * (e.getValue() / 100.0)).sum());
         score = Math.max(0, Math.min(100, score));
-        boolean compoundPhishing = financialLure && accountAccessCta && has(found, "SHORTENED_URL");
-        if (compoundPhishing) score = Math.max(score, 75);
+        boolean financialPhishing = financialLure && accountAccessCta && has(found, "SHORTENED_URL");
+        boolean legalDocumentTrap = legalLure && documentAccessCta;
+        boolean suspiciousLegalLink = has(found, "EMBEDDED_IP_HOSTNAME") || has(found, "OPAQUE_QUERY") ||
+                has(found, "GENERIC_HOSTING_DOMAIN") || has(found, "SHORTENED_URL") || has(found, "SUSPICIOUS_TLD");
+        boolean legalPhishing = legalDocumentTrap && hasEmbeddedUrl && suspiciousLegalLink;
+        boolean compoundPhishing = financialPhishing || legalPhishing;
+        if (legalDocumentTrap) score = Math.max(score, 65);
+        if (financialPhishing) score = Math.max(score, 75);
+        if (legalPhishing) score = Math.max(score, 80);
         String level = score <= 20 ? "LOW" : score <= 40 ? "CAUTION" : score <= 60 ? "MEDIUM" : score <= 80 ? "HIGH" : "CRITICAL";
         boolean credential = has(found, "CREDENTIAL_REQUEST"); boolean brand = has(found, "BRAND_IMPERSONATION");
         String classification = compoundPhishing || credential && brand ? "PHISHING" : has(found, "PAYMENT_REQUEST") && score > 40 ? "FRAUD" : score > 20 ? "SUSPICIOUS" : "LOW_RISK";
@@ -106,9 +124,19 @@ public class RiskEngineService {
         Set<String> riskyTlds = Set.of("zip", "mov", "click", "top", "xyz", "work", "support");
         boolean shortened = shorteners.contains(domain);
         boolean suspiciousPath = url.matches("(?s).*(login|verify|verificar|secure|cuenta|wallet|premio|acceder|bancario|deposito|deposit|fondos).*");
+        boolean embeddedIp = hasEmbeddedIpv4Prefix(domain);
+        boolean officialPublicSectorDomain = isOfficialPublicSectorDomain(domain);
+        boolean opaqueQuery = !officialPublicSectorDomain && url.matches("(?s).*\\?[a-z0-9]{5,}=[^&#\\s]{6,}.*");
+        boolean genericHosting = domain.endsWith(".host.secureserver.net");
         add(found, shortened, "SHORTENED_URL", "URL_REPUTATION", 75, "MEDIUM", .9, "El enlace oculta el destino mediante un acortador.");
         add(found, shortened && suspiciousPath, "SUSPICIOUS_REDIRECT", "DOMAIN_ANALYSIS", 90, "HIGH", .88,
                 "El acortador oculta el destino y su ruta contiene términos financieros o de acceso.");
+        add(found, embeddedIp, "EMBEDDED_IP_HOSTNAME", "DOMAIN_ANALYSIS", 100, "HIGH", .94,
+                "El host comienza con una dirección IP incrustada en un dominio ajeno a la supuesta entidad.");
+        add(found, opaqueQuery, "OPAQUE_QUERY", "URL_REPUTATION", 90, "HIGH", .86,
+                "El enlace usa parámetros opacos que dificultan reconocer su propósito.");
+        add(found, genericHosting, "GENERIC_HOSTING_DOMAIN", "URL_REPUTATION", 80, "HIGH", .84,
+                "El destino usa un hostname técnico de alojamiento en lugar de un dominio institucional.");
         add(found, url.contains("[redacted_email]"), "IDENTIFIER_IN_URL", "URL_REPUTATION", 85, "HIGH", .84,
                 "El enlace incorpora un identificador personal en sus parámetros.");
         String tld = domain.contains(".") ? domain.substring(domain.lastIndexOf('.') + 1) : "";
@@ -152,6 +180,24 @@ public class RiskEngineService {
     }
     private boolean has(List<Indicator> list, String type) { return list.stream().anyMatch(i -> i.type().equals(type)); }
     private ApiException invalidUrl() { return new ApiException(HttpStatus.BAD_REQUEST, "INVALID_URL", "La URL no tiene un formato válido."); }
+    private boolean hasEmbeddedIpv4Prefix(String host) {
+        String[] labels = host.split("\\.");
+        if (labels.length < 5) return false;
+        for (int i = 0; i < 4; i++) {
+            if (!labels[i].matches("\\d{1,3}")) return false;
+            try {
+                if (Integer.parseInt(labels[i]) > 255) return false;
+            } catch (NumberFormatException ignored) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isOfficialPublicSectorDomain(String host) {
+        return host.equals("argentina.gob.ar") || host.endsWith(".gob.ar") || host.endsWith(".gov.ar") || host.endsWith(".jus.gov.ar");
+    }
+
     private boolean isPrivateHost(String host) {
         return host.equals("localhost") || host.equals("0.0.0.0") || host.equals("::1") || host.startsWith("127.") || host.startsWith("10.") ||
                 host.startsWith("192.168.") || host.matches("172\\.(1[6-9]|2\\d|3[01])\\..*") || host.equals("169.254.169.254") || host.endsWith(".local");

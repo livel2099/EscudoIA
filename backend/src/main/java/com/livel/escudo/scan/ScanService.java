@@ -34,7 +34,8 @@ public class ScanService {
         RiskEngineService.Analysis analysis = "URL".equals(type) ? risk.analyzeUrl(content) : risk.analyzeText(content);
         if (user == null) return fromTransient(UUID.randomUUID(), type, analysis);
         RiskModels.Result result = analysis.result();
-        ScanEntity entity = new ScanEntity(user.getId(), type, analysis.sanitizedInput(), result.score(), result.level(),
+        String storedInput = "IMAGE".equals(type) ? "[OCR_ANALYZADO_SIN_CONTENIDO]" : analysis.sanitizedInput();
+        ScanEntity entity = new ScanEntity(user.getId(), type, storedInput, result.score(), result.level(),
                 result.classification(), result.confidence(), result.summary(), result.recommendedAction(), result.engineVersion());
         result.indicators().forEach(i -> entity.addIndicator(new RiskIndicatorEntity(i.type(), i.category(), i.score(), i.severity(), i.source(), i.confidence(), i.explanation())));
         scans.save(entity);

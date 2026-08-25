@@ -6,9 +6,10 @@ MVP CyberTech para evaluar riesgo en mensajes, enlaces y capturas. Entrega un sc
 
 - Registro, login, JWT de corta duración y refresh tokens rotables/revocables.
 - Roles `USER`, `ADMIN` y `SUPER_ADMIN`, bootstrap seguro del primer administrador.
-- Quick Scan público y análisis autenticado de texto, URL e imagen contextual.
+- Quick Scan público y análisis autenticado de texto, URL y capturas con OCR local en español e inglés.
 - Risk Engine determinístico, versionado y configurable desde ADMIN.
 - Redacción de correo, teléfono, tarjeta, CUIT/CUIL y OTP antes de la capa IA mock.
+- Las capturas y su texto OCR no se guardan; sólo se persisten el resultado y sus indicadores.
 - URLs normalizadas sin fetch activo; bloqueo explícito de destinos privados/locales.
 - Historial con ownership, cuota diaria, request ID, rate limit y auditoría con IP/User-Agent hasheados.
 - Planes/precios en PostgreSQL, checkout único y suscripción de Mercado Pago, webhook idempotente y verificación por API.
@@ -23,7 +24,7 @@ El proceso principal **no visita URLs enviadas por usuarios**. Un scanner activo
 
 ## Desarrollo local
 
-Requisitos: Java 21+, Maven 3.9+, Node 22+ y Docker para PostgreSQL.
+Requisitos: Java 21+, Maven 3.9+, Node 22+, Tesseract con datos `spa+eng` y Docker para PostgreSQL. El contenedor de producción ya incluye Tesseract.
 
 ```bash
 docker compose up -d postgres
@@ -77,7 +78,7 @@ La lista completa está en `.env.example`. En producción son obligatorios una c
 
 ## Próxima fase
 
-- OCR/multimodal real para capturas mediante `AIProvider` y object storage con URLs firmadas.
+- Complemento multimodal del OCR para detectar señales visuales sin almacenar las capturas.
 - Threat Intelligence real y scanner aislado con egress controlado.
 - Activación efectiva de beneficios de suscripción, cancelaciones contra Mercado Pago y cuotas por plan.
 - Informe PDF, Family, modo incidente, notificaciones y métricas comerciales.
